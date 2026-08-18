@@ -1,46 +1,31 @@
-from datetime import datetime
-from flask import Flask, render_template, request
+from flask import Flask, redirect, render_template, session, url_for
 from flask_bootstrap import Bootstrap
-from flask_moment import Moment
+from flask_wtf import FlaskForm
+from wtforms import StringField, SubmitField
+from wtforms.validators import DataRequired
 
 app = Flask(__name__)
+app.config['SECRET_KEY'] = 'chave-secreta-aula-flask'
 
 bootstrap = Bootstrap(app)
-moment = Moment(app)
 
 
-@app.route('/')
+class NameForm(FlaskForm):
+    name = StringField('What is your name?', validators=[DataRequired()])
+    submit = SubmitField('Submit')
+
+
+@app.route('/', methods=['GET', 'POST'])
 def index():
-    current_time = datetime.utcnow()
-    return render_template('index.html', current_time=current_time)
+    form = NameForm()
+    if form.validate_on_submit():
+        # Salva o nome digitado na sessão do navegador
+        session['name'] = form.name.data
+        return redirect(url_for('index'))
 
-
-@app.route('/identificacao')
-def identificacao():
-    nome = "Matheus Zanqueta Vitor"
-    prontuario = "PT3035875"
-    instituicao = "IFSP"
-    return render_template(
-        'identificacao.html',
-        nome=nome,
-        prontuario=prontuario,
-        instituicao=instituicao,
-    )
-
-
-@app.route('/contexto')
-def contexto():
-    nome = "Matheus Zanqueta Vitor"
-    user_agent = request.headers.get('User-Agent')
-    remote_addr = request.remote_addr
-    host = request.host
-    return render_template(
-        'contexto.html',
-        nome=nome,
-        user_agent=user_agent,
-        remote_addr=remote_addr,
-        host=host,
-    )
+    # Busca o nome salvo na sessão (retorna None se não houver)
+    name = session.get('name')
+    return render_template('index.html', form=form, name=name)
 
 
 if __name__ == '__main__':
