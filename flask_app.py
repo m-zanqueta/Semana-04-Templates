@@ -45,6 +45,7 @@ def index():
 
     if form.validate_on_submit():
         old_nome = session.get('nome')
+        # Exibe o alerta se o nome informado for diferente do nome anterior guardado na sessão
         if old_nome is not None and old_nome != form.nome.data:
             flash('Você alterou o seu nome!')
 
