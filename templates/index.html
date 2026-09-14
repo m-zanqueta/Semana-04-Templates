@@ -3,19 +3,62 @@
 
 {% block page_content %}
 <div class="page-header">
-    <h1>Olá, {{ nome if nome else 'asdsads' }} {{ sobrenome if sobrenome else '' }}!</h1>
+    <h1>Olá, {{ name if name else 'Stranger' }}!</h1>
+    <p>Prazer em conhecê-lo!</p>
 </div>
-<h3>A sua Insituição de ensino é {{ instituicao if instituicao else '' }}</h3>
-<h3>Está cursando a disciplina de {{ disciplina if disciplina else '' }}</h3>
 
-<br>
-<p>O IP do computador remoto é: {{ remote_addr }}</p>
-<p>O host da aplicação é: {{ host }}</p>
-
-<br>
 {{ wtf.quick_form(form) }}
 
-<br>
-<p>The local date and time is {{ moment(current_time).format('LLL') }}.</p>
-<p>That was {{ moment(current_time).fromNow() }}.</p>
+<hr>
+
+<!-- Primeira Tabela: Relação de usuários -->
+<h2>Relação de usuários cadastrados</h2>
+<p>Quantidade: {{ users|length }}</p>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Nome do usuário</th>
+            <th>Função</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for u in users %}
+        <tr>
+            <td>{{ u.username }}</td>
+            <td>{{ u.role.name }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<hr>
+
+<!-- Segunda Tabela: Relação de funções e usuários agrupados -->
+<h2>Relação de funções cadastradas</h2>
+<p>Quantidade: {{ roles|length }}</p>
+
+<table class="table table-striped">
+    <thead>
+        <tr>
+            <th>Funções</th>
+            <th>Usuários</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in roles %}
+        <tr>
+            <td>{{ r.name }}</td>
+            <td>
+                <!-- Iterando sobre os usuários conectados a esta função (relacionamento do db) -->
+                <ol>
+                    {% for u in r.users %}
+                    <li>{{ u.username }}</li>
+                    {% endfor %}
+                </ol>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 {% endblock %}
