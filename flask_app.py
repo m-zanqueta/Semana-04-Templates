@@ -1,100 +1,115 @@
 import os
-from flask import Flask, redirect, render_template, session, url_for
+from datetime import datetime
+from flask import Flask, flash, redirect, render_template, request, session, url_for
 from flask_bootstrap import Bootstrap
+from flask_moment import Moment
 from flask_wtf import FlaskForm
-from wtforms import SelectField, StringField, SubmitField
+from wtforms import PasswordField, SelectField, StringField, SubmitField
 from wtforms.validators import DataRequired
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 
-# Define o diretório base para salvar o arquivo do banco de dados
 basedir = os.path.abspath(os.path.dirname(__file__))
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'chave-secreta'
-
-# Configuração do banco de dados SQLite
+app.config['SECRET_KEY'] = 'chave-secreta-aula-050'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'data.sqlite')
-# Desativa o rastreamento de modificações para economizar memória
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False 
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 bootstrap = Bootstrap(app)
-
-# Inicializa o SQLAlchemy[cite: 1]
+moment = Moment(app)
 db = SQLAlchemy(app)
-# Inicializa o Flask-Migrate[cite: 1]
 migrate = Migrate(app, db)
 
 
-# --- DEFINIÇÃO DOS MODELOS ---
-# Classe Role (Funções)[cite: 1]
+# --- MODELOS DE BANCO DE DADOS ---
 class Role(db.Model):
-    __tablename__ = 'roles' # Define o nome da tabela[cite: 1]
-    id = db.Column(db.Integer, primary_key=True) # Chave primária[cite: 1]
+    __tablename__ = 'roles'
+    id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64), unique=True)
-    # Relacionamento um-para-muitos com a classe User[cite: 1]
-    users = db.relationship('User', backref='role', lazy='dynamic') 
+    users = db.relationship('User', backref='role', lazy='dynamic')
 
     def __repr__(self):
         return '<Role %r>' % self.name
 
 
-# Classe User (Usuários)[cite: 1]
 class User(db.Model):
-    __tablename__ = 'users' # Define o nome da tabela[cite: 1]
-    id = db.Column(db.Integer, primary_key=True) # Chave primária[cite: 1]
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, index=True)
-    # Chave estrangeira ligando à tabela roles[cite: 1]
-    role_id = db.Column(db.Integer, db.ForeignKey('roles.id')) 
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
 
     def __repr__(self):
         return '<User %r>' % self.username
 
 
-# --- FORMULÁRIO ---
+# --- FORMULÁRIOS ---
 class NameForm(FlaskForm):
     name = StringField('What is your name?', validators=[DataRequired()])
-    # Campo de seleção para as funções
     role = SelectField('Role?:', coerce=int)
     submit = SubmitField('Submit')
 
+class LoginForm(FlaskForm):
+    usuario = StringField('Usuário ou e-mail', validators=[DataRequired()])
+    senha = PasswordField('Informe a sua senha', validators=[DataRequired()])
+    submit = SubmitField('Enviar')
 
-# --- ROTAS ---
+
+# --- ROTAS PRINCIPAIS ---
 @app.route('/', methods=['GET', 'POST'])
 def index():
     form = NameForm()
+    current_time = datetime.utcnow()
     
-    # Preenche o formulário com as opções de funções do banco de dados[cite: 1]
-    form.role.choices = [(r.id, r.name) for r in Role.query.order_by('name').all()]
+    # Preenche o formulário com a sintaxe correta para evitar o Erro 500
+    form.role.choices = [(r.id, r.name) for r in Role.query.order_by(Role.name).all()]
 
     if form.validate_on_submit():
-        # Verifica se o usuário já existe no banco consultando o banco[cite: 1]
+        # Lógica de alerta (flash)
+        old_name = session.get('name')
+        if old_name is None or old_name != form.name.data:
+            flash('Você alterou o seu nome!')
+
+        # Lógica do Banco de Dados
         user = User.query.filter_by(username=form.name.data).first()
-        
         if user is None:
-            # Pega o objeto da função (Role) com base na escolha do usuário[cite: 1]
             selected_role = Role.query.get(form.role.data)
-            
-            # Cria a instância do novo usuário atrelando à função[cite: 1]
             user = User(username=form.name.data, role=selected_role)
-            
-            # Adiciona e grava o objeto no banco de dados[cite: 1]
             db.session.add(user)
             db.session.commit()
             
         session['name'] = form.name.data
         return redirect(url_for('index'))
 
-    # Consulta todos os usuários e todas as funções para exibir nas tabelas[cite: 1]
+    # Consultas para as tabelas do HTML
     users = User.query.all()
     roles = Role.query.all()
 
     return render_template(
-        'index.html', 
-        form=form, 
-        name=session.get('name'), 
-        users=users, 
-        roles=roles
+        'index.html',
+        form=form,
+        name=session.get('name'),
+        users=users,
+        roles=roles,
+        remote_addr=request.remote_addr,
+        host=request.host,
+        current_time=current_time,
+    )
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    form = LoginForm()
+    current_time = datetime.utcnow()
+    usuario_logado = None
+
+    if form.validate_on_submit():
+        usuario_logado = form.usuario.data
+
+    return render_template(
+        'login.html',
+        form=form,
+        usuario=usuario_logado,
+        current_time=current_time,
     )
 
 
