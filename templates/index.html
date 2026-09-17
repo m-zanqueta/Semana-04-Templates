@@ -2,63 +2,18 @@
 {% import "bootstrap/wtf.html" as wtf %}
 
 {% block page_content %}
-<div class="page-header">
-    <h1>Olá, {{ name if name else 'Stranger' }}!</h1>
-    <p>Prazer em conhecê-lo!</p>
+<div class="page-header" style="border-bottom: none; margin-bottom: 10px; padding-bottom: 0;">
+    <h1 style="font-size: 42px; font-weight: normal; margin-bottom: 8px;">
+        Hello, {% if name %}{{ name }}{% else %}Stranger{% endif %}!
+    </h1>
+    <p style="font-size: 16px; color: #333;">Pleased to meet you!</p>
 </div>
 
-{{ wtf.quick_form(form) }}
+<hr style="border-top: 1px solid #eee; margin-top: 15px; margin-bottom: 25px;">
 
-<hr>
-
-<!-- Primeira Tabela: Relação de usuários -->
-<h2>Relação de usuários cadastrados</h2>
-<p>Quantidade: {{ users|length }}</p>
-
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Nome do usuário</th>
-            <th>Função</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for u in users %}
-        <tr>
-            <td>{{ u.username }}</td>
-            <td>{{ u.role.name }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-
-<hr>
-
-<!-- Segunda Tabela: Relação de funções e usuários agrupados -->
-<h2>Relação de funções cadastradas</h2>
-<p>Quantidade: {{ roles|length }}</p>
-
-<table class="table table-striped">
-    <thead>
-        <tr>
-            <th>Funções</th>
-            <th>Usuários</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for r in roles %}
-        <tr>
-            <td>{{ r.name }}</td>
-            <td>
-                <!-- Iterando sobre os usuários conectados a esta função (relacionamento do db) -->
-                <ol>
-                    {% for u in r.users %}
-                    <li>{{ u.username }}</li>
-                    {% endfor %}
-                </ol>
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+<div class="row">
+    <div class="col-md-12">
+        {{ wtf.quick_form(form) }}
+    </div>
+</div>
 {% endblock %}

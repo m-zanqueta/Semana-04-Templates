@@ -1,116 +1,93 @@
 import os
-from datetime import datetime
-from flask import Flask, flash, redirect, render_template, request, session, url_for
+from dotenv import load_dotenv
+import requests
+from flask import Flask, flash, redirect, render_template, session, url_for
 from flask_bootstrap import Bootstrap
-from flask_moment import Moment
 from flask_wtf import FlaskForm
-from wtforms import PasswordField, SelectField, StringField, SubmitField
+from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
 
 basedir = os.path.abspath(os.path.dirname(__file__))
+load_dotenv(os.path.join(basedir, '.env'))
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = 'chave-secreta-aula-050'
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'data.sqlite')
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SECRET_KEY'] = 'chave-secreta-flasky'
+
+app.config['API_KEY'] = os.environ.get('API_KEY', '')
+app.config['API_URL'] = os.environ.get('API_URL', 'https://api.sendgrid.com/v3/mail/send')
+app.config['API_FROM'] = os.environ.get('API_FROM', 'm.zanqueta@aluno.ifsp.edu.br')
+app.config['FLASKY_MAIL_SUBJECT_PREFIX'] = '[Flasky]'
+
+STUDENT_PRONTUARIO = "PT3035875"
+STUDENT_NAME = "Matheus Zanqueta"
+RECIPIENTS = ['flaskaulasweb@zohomail.com','m.zanqueta@aluno.ifsp.edu.br']
 
 bootstrap = Bootstrap(app)
-moment = Moment(app)
-db = SQLAlchemy(app)
-migrate = Migrate(app, db)
 
 
-# --- MODELOS DE BANCO DE DADOS ---
-class Role(db.Model):
-    __tablename__ = 'roles'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(64), unique=True)
-    users = db.relationship('User', backref='role', lazy='dynamic')
-
-    def __repr__(self):
-        return '<Role %r>' % self.name
-
-
-class User(db.Model):
-    __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(64), unique=True, index=True)
-    role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
-
-    def __repr__(self):
-        return '<User %r>' % self.username
-
-
-# --- FORMULÁRIOS ---
 class NameForm(FlaskForm):
     name = StringField('What is your name?', validators=[DataRequired()])
-    role = SelectField('Role?:', coerce=int)
     submit = SubmitField('Submit')
 
-class LoginForm(FlaskForm):
-    usuario = StringField('Usuário ou e-mail', validators=[DataRequired()])
-    senha = PasswordField('Informe a sua senha', validators=[DataRequired()])
-    submit = SubmitField('Enviar')
+
+def send_email(to_list, subject, template, **kwargs):
+    if not app.config['API_URL'] or not app.config['API_KEY']:
+        print("Erro: API_KEY ou API_URL ausentes no .env")
+        return None
+
+    try:
+        html_content = render_template(template + '.html', **kwargs)
+        headers = {
+            "Authorization": f"Bearer {app.config['API_KEY']}",
+            "Content-Type": "application/json"
+        }
+
+        # Estrutura do payload exigido pela API v3 do SendGrid
+        payload = {
+            "personalizations": [
+                {
+                    "to": [{"email": email} for email in to_list]
+                }
+            ],
+            "from": {"email": app.config['API_FROM']},
+            "subject": f"{app.config['FLASKY_MAIL_SUBJECT_PREFIX']} {subject}",
+            "content": [
+                {
+                    "type": "text/html",
+                    "value": html_content
+                }
+            ]
+        }
+
+        response = requests.post(app.config['API_URL'], json=payload, headers=headers)
+        print(f"SendGrid Status Code: {response.status_code}")
+        return response.status_code
+    except Exception as e:
+        print(f"Erro ao enviar e-mail via SendGrid: {e}")
+        return None
 
 
-# --- ROTAS PRINCIPAIS ---
 @app.route('/', methods=['GET', 'POST'])
 def index():
     form = NameForm()
-    current_time = datetime.utcnow()
-    
-    # Preenche o formulário com a sintaxe correta para evitar o Erro 500
-    form.role.choices = [(r.id, r.name) for r in Role.query.order_by(Role.name).all()]
-
     if form.validate_on_submit():
-        # Lógica de alerta (flash)
         old_name = session.get('name')
         if old_name is None or old_name != form.name.data:
-            flash('Você alterou o seu nome!')
+            flash('Looks like you have changed your name!')
 
-        # Lógica do Banco de Dados
-        user = User.query.filter_by(username=form.name.data).first()
-        if user is None:
-            selected_role = Role.query.get(form.role.data)
-            user = User(username=form.name.data, role=selected_role)
-            db.session.add(user)
-            db.session.commit()
-            
+            send_email(
+                to_list=RECIPIENTS,
+                subject='Novo Usuário Cadastrado',
+                template='mail/new_user',
+                username=form.name.data,
+                student_name=STUDENT_NAME,
+                prontuario=STUDENT_PRONTUARIO
+            )
+
         session['name'] = form.name.data
         return redirect(url_for('index'))
 
-    # Consultas para as tabelas do HTML
-    users = User.query.all()
-    roles = Role.query.all()
-
-    return render_template(
-        'index.html',
-        form=form,
-        name=session.get('name'),
-        users=users,
-        roles=roles,
-        remote_addr=request.remote_addr,
-        host=request.host,
-        current_time=current_time,
-    )
-
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    form = LoginForm()
-    current_time = datetime.utcnow()
-    usuario_logado = None
-
-    if form.validate_on_submit():
-        usuario_logado = form.usuario.data
-
-    return render_template(
-        'login.html',
-        form=form,
-        usuario=usuario_logado,
-        current_time=current_time,
-    )
+    return render_template('index.html', form=form, name=session.get('name'))
 
 
 if __name__ == '__main__':
