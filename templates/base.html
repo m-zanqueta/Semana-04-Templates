@@ -1,6 +1,6 @@
 {% extends "bootstrap/base.html" %}
 
-{% block title %}Flasky{% endblock %}
+{% block title %}Avaliação Contínua{% endblock %}
 
 {% block head %}
 {{ super() }}
@@ -16,20 +16,19 @@
         gap: 20px;
     }
     .brand-link {
-        color: #cccccc;
+        color: #888888;
         font-size: 16px;
         text-decoration: none;
     }
-    .brand-link:hover {
-        color: #ffffff;
-        text-decoration: none;
+    .brand-link strong {
+        color: #cccccc;
     }
     .nav-item-link {
         color: #888888;
         font-size: 14px;
         text-decoration: none;
     }
-    .nav-item-link:hover {
+    .brand-link:hover, .nav-item-link:hover {
         color: #ffffff;
         text-decoration: none;
     }
@@ -40,7 +39,7 @@
 <div class="top-navbar">
     <div class="container">
         <div class="navbar-content">
-            <a href="{{ url_for('index') }}" class="brand-link">Flasky</a>
+            <span class="brand-link">Avaliação contínua: <strong>Aula 070</strong></span>
             <a href="{{ url_for('index') }}" class="nav-item-link">Home</a>
         </div>
     </div>

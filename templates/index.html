@@ -2,18 +2,36 @@
 {% import "bootstrap/wtf.html" as wtf %}
 
 {% block page_content %}
-<div class="page-header" style="border-bottom: none; margin-bottom: 10px; padding-bottom: 0;">
-    <h1 style="font-size: 42px; font-weight: normal; margin-bottom: 8px;">
-        Hello, {% if name %}{{ name }}{% else %}Stranger{% endif %}!
-    </h1>
-    <p style="font-size: 16px; color: #333;">Pleased to meet you!</p>
+<div class="page-header">
+    <h1>Olá, {% if name %}{{ name }}{% else %}Stranger{% endif %}!</h1>
+    
+    {% if not known %}
+    <p>Prazer em conhecê-lo!</p>
+    <p>E-mail enviado para o <strong>Administrador do sistema</strong>, notificando o cadastro de um novo usuário.</p>
+    {% else %}
+    <p>Feliz em vê-lo novamente!</p>
+    {% endif %}
 </div>
 
-<hr style="border-top: 1px solid #eee; margin-top: 15px; margin-bottom: 25px;">
+<!-- Renderiza o campo de nome, a caixinha de seleção e o botão Submit -->
+{{ wtf.quick_form(form) }}
 
-<div class="row">
-    <div class="col-md-12">
-        {{ wtf.quick_form(form) }}
-    </div>
-</div>
+<br>
+<h2>Relação de usuários cadastrados</h2>
+<table class="table table-hover">
+    <thead>
+        <tr>
+            <th>Nome do usuário</th>
+            <th>Função</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for user in users %}
+        <tr>
+            <td>{{ user.username }}</td>
+            <td>{% if user.role %}{{ user.role.name }}{% else %}User{% endif %}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 {% endblock %}
