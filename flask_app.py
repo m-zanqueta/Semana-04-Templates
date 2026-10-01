@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from dotenv import load_dotenv
 import requests
 from flask import Flask, flash, redirect, render_template, session, url_for
@@ -17,11 +18,12 @@ app.config['SECRET_KEY'] = 'chave-secreta-flasky'
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///' + os.path.join(basedir, 'data.sqlite')
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Credenciais do SendGrid configuradas no seu .env
+# Configurações do SendGrid
 app.config['API_KEY'] = os.environ.get('API_KEY', '')
 app.config['API_URL'] = os.environ.get('API_URL', 'https://api.sendgrid.com/v3/mail/send')
 app.config['API_FROM'] = os.environ.get('API_FROM', 'm.zanqueta@aluno.ifsp.edu.br')
-app.config['FLASKY_MAIL_SUBJECT_PREFIX'] = '[Avaliação Contínua]'
+# Ajuste do prefixo para corresponder à imagem
+app.config['FLASKY_MAIL_SUBJECT_PREFIX'] = '[Flasky]' 
 
 STUDENT_PRONTUARIO = "PT3035875"
 STUDENT_NAME = "Matheus Zanqueta"
@@ -31,12 +33,14 @@ db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
 
+# ==========================================
+# MODELOS DE BASE DE DADOS
+# ==========================================
 class Role(db.Model):
     __tablename__ = 'roles'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64), unique=True)
     users = db.relationship('User', backref='role', lazy='dynamic')
-
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -44,16 +48,27 @@ class User(db.Model):
     username = db.Column(db.String(64), unique=True, index=True)
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id'))
 
+class SentEmail(db.Model):
+    __tablename__ = 'sent_emails'
+    id = db.Column(db.Integer, primary_key=True)
+    sender_name = db.Column(db.String(64))
+    recipients = db.Column(db.String(256))
+    subject = db.Column(db.String(128))
+    body = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, default=datetime.now)
 
+
+# ==========================================
+# FORMULÁRIOS E E-MAIL
+# ==========================================
 class NameForm(FlaskForm):
     name = StringField('Qual é o seu nome?', validators=[DataRequired()])
     send_email_prof = BooleanField('Deseja enviar e-mail para flaskaulasweb@zohomail.com?')
     submit = SubmitField('Submit')
 
-
 def send_email(to_list, subject, template, **kwargs):
     if not app.config['API_URL'] or not app.config['API_KEY']:
-        print("Erro: API_KEY não encontrada no .env")
+        print("Erro: API_KEY não encontrada")
         return None
 
     try:
@@ -75,6 +90,9 @@ def send_email(to_list, subject, template, **kwargs):
         return None
 
 
+# ==========================================
+# ROTAS
+# ==========================================
 @app.route('/', methods=['GET', 'POST'])
 def index():
     form = NameForm()
@@ -87,14 +105,29 @@ def index():
             db.session.commit()
             session['known'] = False
             
-            # Lógica da Caixinha (Checkbox):
+            # Lógica dos destinatários
             destinatarios = ['m.zanqueta@aluno.ifsp.edu.br']
-            if form.send_email_prof.data: # Se a caixinha estiver marcada
+            if form.send_email_prof.data:
                 destinatarios.append('flaskaulasweb@zohomail.com')
+                # Formatação em string para reproduzir a coluna "Para" da imagem
+                recipients_str = "['m.zanqueta@aluno.ifsp.edu.br', 'flaskaulasweb@zohomail.com']"
+            else:
+                recipients_str = "'m.zanqueta@aluno.ifsp.edu.br'"
             
+            # Persistir o e-mail na base de dados
+            novo_email = SentEmail(
+                sender_name=form.name.data,
+                recipients=recipients_str,
+                subject="[Flasky] Novo usuário",
+                body=f"Novo usuário cadastrado: {form.name.data}"
+            )
+            db.session.add(novo_email)
+            db.session.commit()
+            
+            # Disparar o e-mail
             send_email(
                 to_list=destinatarios,
-                subject='Novo Usuário Cadastrado',
+                subject='Novo usuário',
                 template='mail/new_user',
                 username=form.name.data,
                 student_name=STUDENT_NAME,
@@ -113,6 +146,13 @@ def index():
     users = User.query.all()
     return render_template('index.html', form=form, name=session.get('name'), 
                            known=session.get('known', False), users=users)
+
+
+@app.route('/emails')
+def emails():
+    # Carrega os e-mails ordenados pelos mais recentes
+    sent_emails = SentEmail.query.order_by(SentEmail.timestamp.desc()).all()
+    return render_template('emails.html', emails=sent_emails)
 
 
 if __name__ == '__main__':
