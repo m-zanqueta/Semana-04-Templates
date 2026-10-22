@@ -1,3 +1,4 @@
+import os
 import requests
 from flask import render_template, session, redirect, url_for, flash
 from . import main
@@ -5,7 +6,6 @@ from .forms import NameForm
 from .. import db
 from ..models import User
 
-# Chave de API direta para garantir o funcionamento do envio
 api_key = os.environ.get('SENDGRID_API_KEY')
 
 def enviar_notificacao_sendgrid(novo_usuario, email_usuario):
